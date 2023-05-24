@@ -133,29 +133,29 @@ function MaskComponent() {
     document.addEventListener("wheel", (e) => {
       // console.log(e.deltaY * 0.01);
       scaleF -= e.deltaY * 0.01;
-      if (scaleF < -2)
-        scaleF = -2;
-      else if (scaleF > 2)
-        scaleF = 2;
-      canvas.width = img.width * 2 ** scaleF;
-      canvas.height = img.height * 2 ** scaleF;
-      ctx.lineWidth = slider.value * 2 ** scaleF;
+      if (scaleF < -5)
+        scaleF = -5;
+      else if (scaleF > 4)
+        scaleF = 4;
+      canvas.width = img.width * (1 + 0.1 * scaleF);
+      canvas.height = img.height * (1 + 0.1 * scaleF);
+      ctx.lineWidth = slider.value * (1 + 0.1 * scaleF);
       ctx.lineCap = 'round';
       circleCursor.style.width = ctx.lineWidth + "px";
       circleCursor.style.height = ctx.lineWidth + "px";
-      scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), 2 ** scaleF);
-      blurredImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(originalBlurredImageData.data), originalBlurredImageData.width, originalBlurredImageData.height), 2 ** scaleF);
+      scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), (1 + 0.1 * scaleF));
+      blurredImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(originalBlurredImageData.data), originalBlurredImageData.width, originalBlurredImageData.height), (1 + 0.1 * scaleF));
       ctx.putImageData(scaledModifiedImageData, 0, 0);
     })
 
     originalB.addEventListener('mousedown', (e) => {
       canvas.style.border = "solid yellow 1px";
-      const tempImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[0].data), historyOfImageData[0].width, historyOfImageData[0].height), 2 ** scaleF);
+      const tempImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[0].data), historyOfImageData[0].width, historyOfImageData[0].height), (1 + 0.1 * scaleF));
       ctx.putImageData(tempImageData, 0, 0);
     });
     originalB.addEventListener('mouseup', (e) => {
       canvas.style.border = "solid black 1px";
-      const tempImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), 2 ** scaleF);
+      const tempImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), (1 + 0.1 * scaleF));
       ctx.putImageData(tempImageData, 0, 0);
     })
 
@@ -226,14 +226,14 @@ function MaskComponent() {
   _undo = () => {
     if (index !== 0) {
       index--;
-      scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), 2 ** scaleF);
+      scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), (1 + 0.1 * scaleF));
       ctx.putImageData(scaledModifiedImageData, 0, 0);
     }
   }
   _do = () => {
     if (index < historyOfImageData.length - 1) {
       index++
-      scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), 2 ** scaleF);
+      scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), (1 + 0.1 * scaleF));
       ctx.putImageData(scaledModifiedImageData, 0, 0);
     };
   }
@@ -301,7 +301,7 @@ function MaskComponent() {
     onCanvas = false;
     if (isDrawing) {
       index++;
-      historyOfImageData = historyOfImageData.slice(0,index).concat(rescaleImageData(new ImageData(new Uint8ClampedArray(scaledModifiedImageData.data), scaledModifiedImageData.width, scaledModifiedImageData.height), 2 ** (-scaleF)));
+      historyOfImageData = historyOfImageData.slice(0,index).concat(rescaleImageData(new ImageData(new Uint8ClampedArray(scaledModifiedImageData.data), scaledModifiedImageData.width, scaledModifiedImageData.height), (1 - 0.1 * scaleF)));
       // console.log(historyOfImageData);
     }
     circleCursor.hidden = true;
@@ -315,7 +315,7 @@ function MaskComponent() {
     ab_y = NaN;
     if (isDrawing) {
       index++;
-      historyOfImageData = historyOfImageData.slice(0,index).concat(rescaleImageData(new ImageData(new Uint8ClampedArray(scaledModifiedImageData.data), scaledModifiedImageData.width, scaledModifiedImageData.height), 2 ** (-scaleF)));
+      historyOfImageData = historyOfImageData.slice(0,index).concat(rescaleImageData(new ImageData(new Uint8ClampedArray(scaledModifiedImageData.data), scaledModifiedImageData.width, scaledModifiedImageData.height), (1 - 0.1 * scaleF)));
       // console.log(historyOfImageData);
     }
     stop()
