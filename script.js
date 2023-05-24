@@ -1,3 +1,4 @@
+//author: silent-sea1119
 function MaskComponent() {
 
   const body = document.body;
