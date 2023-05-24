@@ -14,7 +14,7 @@ function MaskComponent() {
   let lastY = 0;
   let index = 0;
   let scaleF = 0;
-  let historyOfImageData = [];
+  let historyOfMask = [];
   let currentHistory;
   let blurredImageData, originalImageData;
 
@@ -63,7 +63,7 @@ function MaskComponent() {
     slider.name = "slider";
     slider.type = "range";
     slider.min = 5;
-    slider.max = 100;
+    slider.max = 300;
     slider.step = 1;
     slider.value = 20;
     slider.disabled = true;
@@ -86,6 +86,11 @@ function MaskComponent() {
     originalB.innerHTML = "<i class=\"fa fa-eye\"></i>";
     originalB.disabled = true;
     toolkit.appendChild(originalB);
+
+    getMaskB = document.createElement('button');
+    getMaskB.innerHTML = "mask";
+    getMaskB.disabled = true;
+    toolkit.appendChild(getMaskB);
 
     downloadB = document.createElement('button');
     downloadB.innerHTML = "<i class=\"fa fa-download\"></i>";
@@ -136,28 +141,37 @@ function MaskComponent() {
     document.addEventListener('mouseup', mouseup);
     document.addEventListener("wheel", (e) => {
       // console.log(e.deltaY * 0.01);
+      let pscaleF = scaleF;
       scaleF -= e.deltaY * 0.01;
       if (scaleF < -5)
         scaleF = -5;
-      else if (scaleF > 4)
-        scaleF = 4;
-      ctx.lineWidth = slider.value * (1 + 0.1 * scaleF);
+      else if (scaleF > 10)
+        scaleF = 10;
+      circleCursor.style.width = circleCursor.style.width.split("px")[0] * (1 + 0.1 * scaleF) / (1 + 0.1 * pscaleF) + "px";
+      circleCursor.style.height = circleCursor.style.height.split("px")[0] * (1 + 0.1 * scaleF) / (1 + 0.1 * pscaleF)  + "px";
       let temp = canvas.style.transform.split(', ');
       temp[0] = `matrix3d(${1 + 0.1 * scaleF}`;
       temp[5] = `${1 + 0.1 * scaleF}`;
       canvas.style.transform = temp.join(', ');
       ctx.lineCap = 'round';
-      circleCursor.style.width = ctx.lineWidth + "px";
-      circleCursor.style.height = ctx.lineWidth + "px";
     })
 
     originalB.addEventListener('mousedown', (e) => {
       canvas.style.border = "solid yellow 1px";
-      ctx.putImageData(historyOfImageData[0], 0, 0);
+      drawOverlay(originalImageData, blurredImageData, historyOfMask[0]);
     });
     originalB.addEventListener('mouseup', (e) => {
       canvas.style.border = "solid black 1px";
-      ctx.putImageData(historyOfImageData[index], 0, 0);
+      drawOverlay(originalImageData, blurredImageData, historyOfMask[index]);
+    })
+
+    getMaskB.addEventListener('mousedown', (e) => {
+      canvas.style.border = "solid green 1px";
+      getMask();
+    });
+    getMaskB.addEventListener('mouseup', (e) => {
+      canvas.style.border = "solid black 1px";
+      drawOverlay(originalImageData, blurredImageData, historyOfMask[index]);
     })
 
     canvas.addEventListener('mousedown', start);
@@ -165,12 +179,12 @@ function MaskComponent() {
     canvas.addEventListener('mouseout', mouseout);
 
     slider.oninput = function () {
-      ctx.lineWidth = this.value * (1 + 0.1 * scaleF);
+      ctx.lineWidth = this.value;
       const rect = canvas.getBoundingClientRect();
-      circleCursor.style.top = (rect.top + rect.width / 2 - ctx.lineWidth / 2) + 'px';
-      circleCursor.style.left = (rect.left + rect.height / 2 - ctx.lineWidth / 2) + 'px';
-      circleCursor.style.width = ctx.lineWidth + "px";
-      circleCursor.style.height = ctx.lineWidth + "px";
+      circleCursor.style.top = (rect.top + rect.width / 2 - ctx.lineWidth * (1 + 0.1 * scaleF) / 2) + 'px';
+      circleCursor.style.left = (rect.left + rect.height / 2 - ctx.lineWidth * (1 + 0.1 * scaleF) / 2) + 'px';
+      circleCursor.style.width = ctx.lineWidth * (1 + 0.1 * scaleF) + "px";
+      circleCursor.style.height = ctx.lineWidth * (1 + 0.1 * scaleF) + "px";
       circleCursor.hidden = false;
       body.style.cursor = 'none';
     }
@@ -200,9 +214,13 @@ function MaskComponent() {
             ctx.strokeStyle = '#000';
             ctx.drawImage(img, 0, 0);
             originalImageData = new ImageData(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
-            historyOfImageData[0] = new Array(canvas.height).fill(new Array(canvas.width).fill(false));
-            currentHistory = [...historyOfImageData[0]];
-            blurredImageData = getBlurredImageData(originalImageData, [255, 191, 0, 0.8]);
+            historyOfMask[0] = [];
+            currentHistory = [];
+            for (let i = 0; i < canvas.height * canvas.width; i++) {
+              historyOfMask[0][i] = false;
+            }
+            currentHistory = [...historyOfMask[0]];
+            blurredImageData = getBlurredImageData(ctx.getImageData(0, 0, canvas.width, canvas.height), [255, 255, 0, 80]);
 
             coverOfFileChooser.hidden = true;
             canvas.hidden = false;
@@ -210,6 +228,7 @@ function MaskComponent() {
             _doB.disabled = false;
             _undoB.disabled = false;
             originalB.disabled = false;
+            getMaskB.disabled = false;
             downloadB.disabled = false;
             mainBoard.style = "width: 100%;  justify-content: center;";
         }
@@ -227,14 +246,14 @@ function MaskComponent() {
   _undo = () => {
     if (index !== 0) {
       index--;
-      currentHistory = historyOfImageData[index];
+      currentHistory = [...historyOfMask[index]];
       drawOverlay(originalImageData, blurredImageData, currentHistory);
     }
   }
   _do = () => {
-    if (index < historyOfImageData.length - 1) {
+    if (index < historyOfMask.length - 1) {
       index++
-      currentHistory = historyOfImageData[index];
+      currentHistory = [...historyOfMask[index]];
       drawOverlay(originalImageData, blurredImageData, currentHistory);
     };
   }
@@ -256,10 +275,10 @@ function MaskComponent() {
   draw = (e) => {
     onCanvas = true;
   
-    circleCursor.style.top = (e.clientY - ctx.lineWidth / 2) + 'px';
-    circleCursor.style.left = (e.clientX - ctx.lineWidth / 2) + 'px';
-    circleCursor.style.width = ctx.lineWidth + "px";
-    circleCursor.style.height = ctx.lineWidth + "px";
+    circleCursor.style.top = (e.clientY - circleCursor.style.width.split("px")[0] / 2) + 'px';
+    circleCursor.style.left = (e.clientX - circleCursor.style.height.split("px")[0] / 2) + 'px';
+    // circleCursor.style.width = ctx.lineWidth + "px";
+    // circleCursor.style.height = ctx.lineWidth + "px";
     if (!draggable) {
       circleCursor.hidden = false;
       body.style.cursor = 'none';
@@ -283,8 +302,7 @@ function MaskComponent() {
     onCanvas = false;
     if (isDrawing) {
       index++;
-      historyOfImageData = historyOfImageData.slice(0,index).concat(currentHistory);
-      // console.log(historyOfImageData);
+      historyOfMask = (historyOfMask.slice(0,index)).concat([[...currentHistory]]);
     }
     circleCursor.hidden = true;
     body.style.cursor = 'auto';
@@ -297,8 +315,7 @@ function MaskComponent() {
     ab_y = NaN;
     if (isDrawing) {
       index++;
-      historyOfImageData = historyOfImageData.slice(0,index).concat(currentHistory);
-      // console.log(historyOfImageData);
+      historyOfMask = (historyOfMask.slice(0,index)).concat([[...currentHistory]]);
     }
     stop()
   }
@@ -313,20 +330,18 @@ function MaskComponent() {
       const greenValue = pixelArray[i + 1];
       const blueValue = pixelArray[i + 2];
       
-      if (redValue == 0 && greenValue == 0 && blueValue == 0) {
+      if (currentHistory[i]) {
         pixelArray[i] = blurredImageData.data[i];
         pixelArray[i + 1] = blurredImageData.data[i + 1];
         pixelArray[i + 2] = blurredImageData.data[i + 2];
         pixelArray[i + 3] = blurredImageData.data[i + 3];
-        console.log(Math.floor((i/4)/canvas.width), (i/4)%canvas.width);
-        currentHistory[Math.floor((i/4)/canvas.width)][(i/4)%canvas.width] = true;
-      } else if (currentHistory[Math.floor((i/4)/canvas.width)][(i/4)%canvas.width]) {
+      } else if (redValue == 0 && greenValue == 0 && blueValue == 0) {
         pixelArray[i] = blurredImageData.data[i];
         pixelArray[i + 1] = blurredImageData.data[i + 1];
         pixelArray[i + 2] = blurredImageData.data[i + 2];
         pixelArray[i + 3] = blurredImageData.data[i + 3];
-      } 
-      else {
+        currentHistory[i] = true;
+      } else {
         pixelArray[i] = originalImageData.data[i];
         pixelArray[i + 1] = originalImageData.data[i + 1];
         pixelArray[i + 2] = originalImageData.data[i + 2];
@@ -334,6 +349,7 @@ function MaskComponent() {
       }
     }
     // console.log(pixelArray);
+    // console.log(pixelArray, currentHistory);
   
     const newImageData = new ImageData(pixelArray, canvas.width, canvas.height);
     ctx.putImageData(newImageData, 0, 0);
@@ -348,30 +364,29 @@ function MaskComponent() {
   };
 
   getBlurredImageData = (originalImageData, overlayColor) => {
-    const outputData = originalImageData.data;
-    for (let i = 0; i < outputData.length; i += 4) {
-      [outputData[i], outputData[i + 1], outputData[i + 2], outputData[i + 3]] = combineColors([outputData[i], outputData[i + 1], outputData[i + 2], outputData[i + 3]], overlayColor);
+    const outputData = [];
+    for (let i = 0; i < originalImageData.data.length; i += 4) {
+      [outputData[i], outputData[i + 1], outputData[i + 2], outputData[i + 3]] = combineColors([originalImageData.data[i], originalImageData.data[i + 1], originalImageData.data[i + 2], originalImageData.data[i + 3]], overlayColor);
     }
 
-    const output = originalImageData;
+    const output = new ImageData(new Uint8ClampedArray(originalImageData.data), canvas.width, canvas.height);
     output.data.set(outputData);
-    console.log('bl', outputData);
 
     return output;
   }
 
   drawOverlay = (originalImageData, blurredImageData, history) => {
+    // console.log(originalImageData, blurredImageData, history);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     // console.log(imageData,scaledModifiedImageData.data.length);
     const pixelArray = imageData.data;
     for (let i = 0; i < pixelArray.length; i += 4) {
-      if (history[Math.floor((i+1)/canvas.width)][(i+1)%canvas.width]) {
+      if (history[i]) {
         pixelArray[i] = blurredImageData.data[i];
         pixelArray[i + 1] = blurredImageData.data[i + 1];
         pixelArray[i + 2] = blurredImageData.data[i + 2];
         pixelArray[i + 3] = blurredImageData.data[i + 3];
-      } 
-      else {
+      } else {
         pixelArray[i] = originalImageData.data[i];
         pixelArray[i + 1] = originalImageData.data[i + 1];
         pixelArray[i + 2] = originalImageData.data[i + 2];
@@ -402,6 +417,27 @@ function MaskComponent() {
   
     // Click the link to start the download
     link.click();
+  }
+
+  getMask = () => {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // console.log(imageData,scaledModifiedImageData.data.length);
+    const pixelArray = imageData.data;
+    for (let i = 0; i < pixelArray.length; i += 4) {
+      if (historyOfMask[index][i]) {
+        pixelArray[i] = blurredImageData.data[i];
+        pixelArray[i + 1] = blurredImageData.data[i + 1];
+        pixelArray[i + 2] = blurredImageData.data[i + 2];
+        pixelArray[i + 3] = blurredImageData.data[i + 3];
+      } else {
+        pixelArray[i] = 255;
+        pixelArray[i + 1] = 255;
+        pixelArray[i + 2] = 255;
+        pixelArray[i + 3] = 255;
+      }
+    }
+    const newImageData = new ImageData(pixelArray, canvas.width, canvas.height);
+    ctx.putImageData(newImageData, 0, 0);
   }
 }
 
