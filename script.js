@@ -28,6 +28,15 @@ function MaskComponent() {
     canvas.style = "border: solid black 1px;";
     mainBoard.appendChild(canvas);
     ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.interpolationQuality = 'high';
+
+    canvasT = document.createElement('canvas');
+    canvasT.hidden = true;
+    mainBoard.appendChild(canvasT);
+    ctxT = canvasT.getContext('2d');
+    ctxT.imageSmoothingEnabled = true;
+    ctxT.interpolationQuality = 'high';
 
     fileChooser = document.createElement('input');
     fileChooser.hidden = true;
@@ -143,9 +152,23 @@ function MaskComponent() {
       ctx.lineCap = 'round';
       circleCursor.style.width = ctx.lineWidth + "px";
       circleCursor.style.height = ctx.lineWidth + "px";
-      scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), 2 ** scaleF);
-      blurredImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(originalBlurredImageData.data), originalBlurredImageData.width, originalBlurredImageData.height), 2 ** scaleF);
-      ctx.putImageData(scaledModifiedImageData, 0, 0);
+
+      console.log(canvas.width, canvas.height);
+      ctx.drawImage(canvasT, 0, 0, canvasT.width, canvasT.height, 0, 0, canvas.width, canvas.height);
+      // retrieve pixel data from resized canvas
+      const imageDataT = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // create new image object from pixel data
+      createImageBitmap(imageDataT).then((bitmap) => {
+        // draw resized image onto original canvas
+        canvasT.width = img.width * 2 ** scaleF;
+        canvasT.height = img.height * 2 ** scaleF;
+        console.log(canvasT.width, canvasT.height);
+        ctxT.drawImage(bitmap, 0, 0);
+      });
+      // scaledModifiedImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(historyOfImageData[index].data), historyOfImageData[index].width, historyOfImageData[index].height), 2 ** scaleF);
+      // blurredImageData = rescaleImageData(new ImageData(new Uint8ClampedArray(originalBlurredImageData.data), originalBlurredImageData.width, originalBlurredImageData.height), 2 ** scaleF);
+      // ctx.putImageData(scaledModifiedImageData, 0, 0);
     })
 
     originalB.addEventListener('mousedown', (e) => {
@@ -198,9 +221,14 @@ function MaskComponent() {
             ctx.lineCap = 'round';
             ctx.strokeStyle = '#000';
             ctx.drawImage(img, 0, 0);
+
+            canvasT.width = img.width;
+            canvasT.height = img.height;
+            ctxT.drawImage(img, 0, 0);
+
             scaledModifiedImageData = new ImageData(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
             historyOfImageData[0] = new ImageData(new Uint8ClampedArray(scaledModifiedImageData.data), scaledModifiedImageData.width, scaledModifiedImageData.height);
-            originalBlurredImageData = gaussianBlur(ctx.getImageData(0, 0, canvas.width, canvas.height), 10);
+            originalBlurredImageData =  overlay(ctx.getImageData(0, 0, canvas.width, canvas.height), [255, 191, 0, 0.6]);
             blurredImageData = new ImageData(new Uint8ClampedArray(originalBlurredImageData.data), originalBlurredImageData.width, originalBlurredImageData.height);
 
             coverOfFileChooser.hidden = true;
@@ -349,7 +377,7 @@ function MaskComponent() {
     ctx.putImageData(newImageData, 0, 0);
   }
 
-  combineColors = (r1, g1, b1, alpha1, r2, g2, b2, alpha2) => {
+  combineColors = ([r1, g1, b1, alpha1], [r2, g2, b2, alpha2]) => {
     const alphaBlend = alpha1 + (1 - alpha1) * alpha2;
     const redBlend = (r1 * alpha1 + r2 * alpha2 * (1 - alpha1)) / alphaBlend;
     const greenBlend = (g1 * alpha1 + g2 * alpha2 * (1 - alpha1)) / alphaBlend;
@@ -357,109 +385,16 @@ function MaskComponent() {
     return [redBlend, greenBlend, blueBlend, alphaBlend];
   };
 
-  gaussianBlur = (imageData, radius) => {
-    const width = imageData.width;
-    const height = imageData.height;
-  
-    // Convert the one-dimensional pixel data into a two-dimensional array
-    const pixels = [];
-    for (let i = 0; i < height; i++) {
-      pixels[i] = [];
-      for (let j = 0; j < width; j++) {
-        const idx = (i * width + j) * 4;
-        pixels[i][j] = [
-          imageData.data[idx],
-          imageData.data[idx + 1],
-          imageData.data[idx + 2],
-          imageData.data[idx + 3]
-        ];
-      }
+  overlay = (imageData, semiTransparentColor) => {
+    const outputData = [];
+
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      [outputData[i], outputData[i + 1], outputData[i + 2], outputData[i + 3]] = combineColors(semiTransparentColor, [imageData.data[i], imageData.data[i + 1], imageData.data[i + 2], imageData.data[i + 3]]);
     }
-  
-    // Generate the Gaussian kernel
-    const kernelSize = radius * 2 + 1;
-    const kernel = generateGaussianKernel(kernelSize, radius);
-  
-    // Convolve the pixels with the Gaussian kernel
-    const convolved = convolve2d(pixels, kernel);
-  
-    // Convert the convolved pixels back into a one-dimensional array
-    const outputData = imageData.data;
-    for (let i = 0; i < height; i++) {
-      for (let j = 0; j < width; j++) {
-        const idx = (i * width + j) * 4;
-        outputData[idx] = convolved[i][j][0];
-        outputData[idx + 1] = convolved[i][j][1];
-        outputData[idx + 2] = convolved[i][j][2];
-        outputData[idx + 3] = convolved[i][j][3];
-      }
-    }
-  
+
     // Create a new ImageData object with the blurred pixel data
     const output = imageData;
     output.data.set(outputData);
-  
-    return output;
-  }
-  
-  
-  generateGaussianKernel = (size, sigma) => {
-    const kernel = [];
-    const center = Math.floor(size / 2);
-    let sum = 0;
-  
-    for (let i = 0; i < size; i++) {
-      kernel[i] = [];
-      for (let j = 0; j < size; j++) {
-        const x = i - center;
-        const y = j - center;
-        kernel[i][j] = gaussian(Math.sqrt(x * x + y * y), sigma);
-        sum += kernel[i][j];
-      }
-    }
-  
-    // Normalize the kernel so that its values add up to 1
-    for (let i = 0; i < size; i++) {
-      for (let j = 0; j < size; j++) {
-        kernel[i][j] /= sum;
-      }
-    }
-  
-    return kernel;
-  }
-  
-  gaussian = (x, sigma) => {
-    return Math.exp(-(x * x) / (2 * sigma * sigma)) / (sigma * Math.sqrt(2 * Math.PI));
-  }
-  
-  convolve2d = (image, kernel) => {
-    const width = image[0].length;
-    const height = image.length;
-    const kernelSize = kernel.length;
-    const kernelRadius = Math.floor(kernelSize / 2);
-    const output = [];
-  
-    for (let y = 0; y < height; y++) {
-      output[y] = [];
-      for (let x = 0; x < width; x++) {
-        let sum = [0, 0, 0, 0];
-        for (let i = -kernelRadius; i <= kernelRadius; i++) {
-          for (let j = -kernelRadius; j <= kernelRadius; j++) {
-            const kx = kernelRadius - j;
-            const ky = kernelRadius - i;
-            const pixelX = x + j;
-            const pixelY = y + i;
-            if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
-              sum[0] += image[pixelY][pixelX][0] * kernel[ky][kx];
-              sum[1] += image[pixelY][pixelX][1] * kernel[ky][kx];
-              sum[2] += image[pixelY][pixelX][2] * kernel[ky][kx];
-              sum[3] += image[pixelY][pixelX][3] * kernel[ky][kx];
-            }
-          }
-        }
-        output[y][x] = sum;
-      }
-    }
   
     return output;
   }
