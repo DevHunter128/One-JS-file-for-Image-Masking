@@ -29,6 +29,15 @@ function MaskComponent() {
     canvas.style = "border: solid black 1px;";
     mainBoard.appendChild(canvas);
     ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.interpolationQuality = 'high';
+
+    canvasT = document.createElement('canvas');
+    canvasT.hidden = true;
+    mainBoard.appendChild(canvasT);
+    ctxT = canvasT.getContext('2d');
+    ctxT.imageSmoothingEnabled = true;
+    ctxT.interpolationQuality = 'high';
 
     fileChooser = document.createElement('input');
     fileChooser.hidden = true;
@@ -213,6 +222,7 @@ function MaskComponent() {
             ctx.lineCap = 'round';
             ctx.strokeStyle = '#000';
             ctx.drawImage(img, 0, 0);
+
             originalImageData = new ImageData(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
             historyOfMask[0] = [];
             currentHistory = [];
@@ -221,6 +231,7 @@ function MaskComponent() {
             }
             currentHistory = [...historyOfMask[0]];
             blurredImageData = getBlurredImageData(ctx.getImageData(0, 0, canvas.width, canvas.height), [255, 255, 0, 80]);
+
 
             coverOfFileChooser.hidden = true;
             canvas.hidden = false;
@@ -356,6 +367,7 @@ function MaskComponent() {
   }
 
   combineColors = ([r1, g1, b1, alpha1], [r2, g2, b2, alpha2]) => {
+
     const alphaBlend = alpha1 + alpha2;
     const redBlend = (r1 * alpha1 + r2 * alpha2) / alphaBlend;
     const greenBlend = (g1 * alpha1 + g2 * alpha2) / alphaBlend;
@@ -370,6 +382,7 @@ function MaskComponent() {
     }
 
     const output = new ImageData(new Uint8ClampedArray(originalImageData.data), canvas.width, canvas.height);
+
     output.data.set(outputData);
 
     return output;
